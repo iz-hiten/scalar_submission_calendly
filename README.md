@@ -6,7 +6,7 @@ A full-featured scheduling and booking web application that closely replicates C
 
 ## Live Demo
 
-> Deploy URL: *[(add your deployed URL here](https://calendly-scalar-submission.vercel.app/))*
+> Deploy URL: *[(deployed link](https://calendly-scalar-submission.vercel.app/))*
 
 ---
 
