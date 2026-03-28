@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "EventType": {
+      "title": "Event Type",
+      "description": "Defines a type of meeting that can be booked.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the event type" },
+        "duration": { "type": "integer", "description": "Duration in minutes" },
+        "slug": { "type": "string", "description": "Unique URL slug" },
+        "description": { "type": "string", "description": "Optional description" },
+        "location": { "type": "string", "description": "Meeting location (e.g. Google Meet)" },
+        "color": { "type": "string", "description": "UI color for the event" },
+        "userId": { "type": "string", "description": "Owner of the event type" }
+      },
+      "required": ["name", "duration", "slug", "userId"]
+    },
+    "Availability": {
+      "title": "Availability",
+      "description": "User's weekly availability schedule.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "timezone": { "type": "string" },
+        "days": {
+          "type": "object",
+          "description": "Map of day names to availability slots"
+        }
+      },
+      "required": ["userId", "timezone", "days"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "A booked meeting instance.",
+      "type": "object",
+      "properties": {
+        "eventTypeId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "inviteeName": { "type": "string" },
+        "inviteeEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["upcoming", "past", "cancelled"] },
+        "notes": { "type": "string", "description": "Optional notes from invitee" },
+        "userId": { "type": "string", "description": "Owner of the meeting" }
+      },
+      "required": ["eventTypeId", "date", "startTime", "endTime", "inviteeName", "inviteeEmail", "status", "userId"]
+    },
+    "SingleUseLink": {
+      "title": "Single Use Link",
+      "description": "A link that can only be used once for scheduling.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "duration": { "type": "integer" },
+        "slug": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "isUsed": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "duration", "slug", "expiresAt", "isUsed", "userId"]
+    },
+    "MeetingPoll": {
+      "title": "Meeting Poll",
+      "description": "A poll to find the best time for a group meeting.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "duration": { "type": "integer" },
+        "options": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] }
+      },
+      "required": ["name", "duration", "options", "userId", "status"]
+    },
+    "Invite": {
+      "title": "Invite",
+      "description": "A team invitation.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "invitedBy": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "invitedBy", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/eventTypes/{eventTypeId}": {
+      "schema": "EventType",
+      "description": "Collection of event types"
+    },
+    "/availability/{userId}": {
+      "schema": "Availability",
+      "description": "User availability settings"
+    },
+    "/meetings/{meetingId}": {
+      "schema": "Meeting",
+      "description": "Collection of booked meetings"
+    },
+    "/singleUseLinks/{linkId}": {
+      "schema": "SingleUseLink",
+      "description": "Collection of single use links"
+    },
+    "/meetingPolls/{pollId}": {
+      "schema": "MeetingPoll",
+      "description": "Collection of meeting polls"
+    },
+    "/invites/{inviteId}": {
+      "schema": "Invite",
+      "description": "Collection of team invitations"
+    }
+  }
+}
