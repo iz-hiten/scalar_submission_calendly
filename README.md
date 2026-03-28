@@ -21,6 +21,7 @@ A full-featured scheduling and booking web application that closely replicates C
 | Animations | Motion (Framer Motion) |
 | Backend / DB | Firebase Firestore (NoSQL) |
 | Auth | Firebase Authentication (Google OAuth) |
+| AI Chatbot | Google Gemini API (`@google/genai`) |
 | Server | Express.js (wraps Vite in dev, serves dist in prod) |
 | Icons | Lucide React |
 | Date Handling | date-fns |
@@ -34,21 +35,25 @@ A full-featured scheduling and booking web application that closely replicates C
 ├── server.ts                  # Express server — Vite middleware in dev, static in prod
 ├── firestore.rules            # Firestore security rules
 ├── firebase-applet-config.json # Firebase project config
+├── .env                       # Local env vars (GEMINI_API_KEY, APP_URL) — not committed
+├── .env.example               # Template for required env vars
 ├── src/
 │   ├── main.tsx               # React entry point
 │   ├── App.tsx                # Router setup, protected routes
 │   ├── firebase.ts            # Firebase init, auth, Firestore exports, error handler
 │   ├── types.ts               # All TypeScript interfaces
-│   ├── index.css              # Global styles
+│   ├── index.css              # Global styles + scrollbar utilities
 │   ├── lib/
 │   │   ├── utils.ts           # cn() helper (clsx + tailwind-merge)
 │   │   └── user.ts            # Demo user config / getCurrentUser helper
 │   ├── components/
-│   │   ├── Layout.tsx         # App shell — sidebar + header + outlet
-│   │   ├── Sidebar.tsx        # Collapsible navigation sidebar
+│   │   ├── Layout.tsx         # App shell — sidebar + header + outlet + chat + onboarding
+│   │   ├── Sidebar.tsx        # Collapsible desktop sidebar + mobile bottom nav + drawer
 │   │   ├── Header.tsx         # Top bar — user avatar, invite modal, profile dropdown
 │   │   ├── Calendar.tsx       # Reusable month calendar with available day highlighting
 │   │   ├── HelpSidebar.tsx    # Slide-in contextual help panel
+│   │   ├── ChatWidget.tsx     # Gemini AI chatbot — floating FAB + chat panel
+│   │   ├── Onboarding.tsx     # First-visit spotlight tour (localStorage-gated)
 │   │   ├── BookMeetingModal.tsx       # Host-side "book on behalf" modal
 │   │   ├── OfferTimeSlotsModal.tsx    # Generate email snippet with available slots
 │   │   ├── ShareAvailabilityModal.tsx # Email composer for sharing availability
@@ -97,9 +102,7 @@ A full-featured scheduling and booking web application that closely replicates C
 - Accessible without login
 
 #### 4. Meetings Page
-- View upcoming meetings (today + future)
-- View past meetings
-- View cancelled meetings (separate tab)
+- View upcoming, past, and cancelled meetings across separate tabs
 - Cancel a meeting with confirmation
 - Expand any meeting card to see full details: email, location, notes, booking link
 - Search meetings by invitee name or email
@@ -110,6 +113,8 @@ A full-featured scheduling and booking web application that closely replicates C
 - Shows all active event types for a user
 - Click any event type to go to its booking page
 - "Powered by Calendly" badge
+
+---
 
 ### Bonus Features
 
@@ -139,14 +144,69 @@ A full-featured scheduling and booking web application that closely replicates C
 - Live-generated embed code that updates as you change settings
 - Copy code to clipboard
 
-#### Help Sidebar
-- Contextual help panel slides in from the right
-- Different content for Scheduling, Meetings, and Availability pages
-
 #### Meeting Polls
 - Create group scheduling polls with multiple time options
 - Vote counts tracked per option
 - Open/closed status
+
+#### Help Sidebar
+- Contextual help panel slides in from the right
+- Different content for Scheduling, Meetings, and Availability pages
+
+---
+
+### New Features
+
+#### Responsive Design (Mobile-First)
+- **Bottom navigation bar** on mobile — Scheduling, Meetings, Availability tabs always accessible
+- **Slide-in drawer** for the full nav menu on mobile (triggered by "More" in the bottom bar)
+- Desktop sidebar is unchanged — same collapsible behavior
+- All pages (Dashboard, Meetings, Availability, BookingPage) stack and reflow correctly on small screens
+- Event type cards, meeting cards, and modal layouts adapt to mobile viewports
+- Tabs scroll horizontally instead of overflowing on narrow screens
+
+#### Sidebar Create Button
+- The "Create" button in the sidebar (and its collapsed `+` icon) now works from any page
+- Navigates to the Dashboard and immediately opens the "New Event Type" modal
+- Uses a custom DOM event (`open-create-modal`) so the sidebar and Dashboard stay decoupled
+
+#### AI Chatbot (Gemini)
+- Floating chat bubble (FAB) in the bottom-right corner of every authenticated page
+- Opens a full chat panel with header, message history, and rich input bar
+- Powered by **Google Gemini 2.5 Flash** via `@google/genai`
+- System-prompted to act as a Calendly assistant — answers scheduling questions, explains features, redirects off-topic queries
+- Persistent chat session across the page lifetime (single module-level instance — no duplicate API calls)
+- Client-side throttle enforces ~13 RPM to stay safely under the free-tier 15 RPM limit
+- Animated typing indicator (bouncing dots) while waiting for a response
+- Error bubbles for rate limits (with retry countdown), missing API key, and network failures
+- Unread dot on the FAB when new bot messages arrive while the panel is closed
+- Input: auto-growing textarea, Enter to send, Shift+Enter for newline, toolbar icons (attachment, emoji, GIF, mic)
+
+#### First-Visit Onboarding Tour
+- 8-step spotlight tour shown automatically on first visit
+- Stored in `localStorage` — never shown again after completion or dismissal
+- Each step dims the entire screen and cuts a glowing spotlight around the relevant UI element (SVG mask technique)
+- Steps cover: Welcome → Sidebar → Create button → Event cards → Availability → Meetings → AI chatbot → Done
+- Tooltip card with step counter, progress bar, dot navigation, Back/Next buttons, and skip (×)
+- Clicking outside the tooltip also dismisses the tour
+- To replay: `localStorage.removeItem('calendly_onboarding_done')` in the browser console
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```env
+# Get your key at: https://aistudio.google.com/app/apikey
+GEMINI_API_KEY="your-gemini-api-key-here"
+
+APP_URL="http://localhost:3000"
+```
+
+Vite exposes `GEMINI_API_KEY` to the frontend via `process.env.GEMINI_API_KEY` (configured in `vite.config.ts`).
+
+> The `.env` file is git-ignored. Never commit your real API key.
 
 ---
 
@@ -188,7 +248,7 @@ A full-featured scheduling and booking web application that closely replicates C
 {
   id: string
   eventTypeId: string
-  userId: string            // owner's UID
+  userId: string
   date: string              // "yyyy-MM-dd"
   startTime: string         // "HH:mm"
   endTime: string           // "HH:mm"
@@ -208,12 +268,12 @@ A full-featured scheduling and booking web application that closely replicates C
   name: string
   duration: number
   slug: string
-  expiresAt: string         // ISO timestamp
+  expiresAt: string
   isUsed: boolean
   userId: string
   eventTypeId?: string
   location?: string
-  weeklyHours?: object      // custom availability override
+  weeklyHours?: object
   timezone?: string
   noticeTime?: string
   createdAt: string
@@ -226,12 +286,7 @@ A full-featured scheduling and booking web application that closely replicates C
   id: string
   name: string
   duration: number
-  options: Array<{
-    date: string
-    startTime: string
-    endTime: string
-    votes: number
-  }>
+  options: Array<{ date: string; startTime: string; endTime: string; votes: number }>
   userId: string
   status: 'open' | 'closed'
   createdAt: string
@@ -242,7 +297,7 @@ A full-featured scheduling and booking web application that closely replicates C
 ```ts
 {
   email: string
-  invitedBy: string         // UID of inviter
+  invitedBy: string
   status: 'pending' | 'accepted'
   createdAt: string
 }
@@ -255,6 +310,7 @@ A full-featured scheduling and booking web application that closely replicates C
 ### Prerequisites
 - Node.js 18+
 - A Firebase project with Firestore and Authentication enabled
+- A Google Gemini API key (free at [aistudio.google.com](https://aistudio.google.com/app/apikey))
 
 ### 1. Clone the repo
 ```bash
@@ -267,7 +323,13 @@ cd <project-folder>
 npm install
 ```
 
-### 3. Configure Firebase
+### 3. Configure environment variables
+```bash
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
+
+### 4. Configure Firebase
 The Firebase config is already in `firebase-applet-config.json`. If using your own project, replace the values:
 ```json
 {
@@ -281,23 +343,23 @@ The Firebase config is already in `firebase-applet-config.json`. If using your o
 }
 ```
 
-### 4. Deploy Firestore Security Rules
+### 5. Deploy Firestore Security Rules
 ```bash
 npm install -g firebase-tools
 firebase login
 firebase deploy --only firestore:rules
 ```
 
-Or paste the contents of `firestore.rules` directly into the Firebase Console → Firestore → Rules tab and click Publish.
+Or paste `firestore.rules` into Firebase Console → Firestore → Rules → Publish.
 
-### 5. Run the development server
+### 6. Run the development server
 ```bash
 npm run dev
 ```
 
 App runs at `http://localhost:3000`
 
-### 6. Build for production
+### 7. Build for production
 ```bash
 npm run build
 npm run preview
@@ -307,37 +369,25 @@ npm run preview
 
 ## Authentication & Demo Mode
 
-The app supports two modes:
+**Google Sign-In** — Click "Continue with Google". Your real Firebase UID is used for all data.
 
-**Google Sign-In** — Click "Continue with Google" on the login page. Your real Firebase UID is used for all data operations.
-
-**Demo Mode** — Click "Continue to Demo Mode". The app uses a fallback user (`default-user`) and shows sample event types, links, and polls if no real data exists. The public booking page (`/b/:slug`) and profile page (`/u/:userId`) are always accessible without any login.
-
-> For the interviewer: the app is pre-configured to work out of the box in demo mode. All core features are functional without signing in.
+**Demo Mode** — Click "Continue to Demo Mode". Uses a fallback `default-user` with sample event types, links, and polls. The public booking page (`/b/:slug`) and profile page (`/u/:userId`) are always accessible without login.
 
 ---
 
 ## Key Design Decisions
 
-**No separate backend API** — Firestore is used directly from the frontend with security rules enforcing access control. This keeps the stack simple while still being production-safe.
+**No separate backend API** — Firestore is used directly from the frontend with security rules enforcing access control.
 
-**Double-booking prevention** — Before confirming a booking, the app queries Firestore for existing non-cancelled meetings at the same `userId + date + startTime`. If a conflict exists, the user is redirected to pick a different slot.
+**Double-booking prevention** — Before confirming a booking, the app queries Firestore for existing non-cancelled meetings at the same `userId + date + startTime`.
 
-**Real-time updates** — Event types, availability, meetings, single-use links, and polls all use Firestore `onSnapshot` listeners, so the UI updates instantly when data changes.
+**Real-time updates** — Event types, availability, meetings, links, and polls all use Firestore `onSnapshot` listeners.
 
-**Public pages are truly public** — `/b/:slug` and `/u/:userId` require no authentication. Firestore rules allow public reads on `eventTypes`, `availability`, `singleUseLinks`, `meetingPolls`, and `meetings`.
+**Single Gemini session** — The AI client and chat session are module-level singletons. React re-renders and StrictMode double-invocations cannot create duplicate sessions or fire extra API calls. A `useRef` in-flight guard prevents concurrent sends.
 
-**Availability drives everything** — The booking page reads the host's availability from Firestore and generates time slots dynamically based on the event duration. Already-booked slots are filtered out before display.
+**Onboarding is localStorage-gated** — No login means no user ID to track, so `localStorage` is the right primitive. Clear `calendly_onboarding_done` to replay the tour.
 
----
-
-## Assumptions
-
-- One host per event type (One-on-One format)
-- Timezone is stored as an IANA string and displayed to invitees; no automatic conversion between timezones is performed
-- Email sending is simulated (the Share modal composes an email but does not actually send — a real integration would require SendGrid/Resend/etc.)
-- The "Powered by Calendly" badge on public pages is intentional as part of the Calendly clone design
-- Sample/seed data is injected client-side when Firestore returns empty results for the demo user
+**Mobile nav strategy** — Rather than hiding the sidebar behind a hamburger (which adds a second nav element), mobile gets a bottom tab bar (the most natural mobile pattern) plus a full-screen drawer for less-used nav items.
 
 ---
 
